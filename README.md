@@ -89,7 +89,7 @@ Per message type (ladder): limit p50/p99 63/144 ns, market 61/142 ns, cancel 71/
 | Sweep 10 levels + refill (per iteration, 41 msgs) | 297 ns | 2,231 ns | 7.5× |
 | Sweep 50 levels + refill (per iteration, 201 msgs) | 1,458 ns | 11,548 ns | 7.9× |
 
-On the x86 CI runner the same benchmarks show 2.5–4.5× speed-ups (e.g. add+cancel 19.6 vs 87.0 ns, deep-book
+On the x86 CI runner the same benchmarks show 2.5–5× speed-ups (e.g. add+cancel 19.6 vs 87.0 ns, deep-book
 cancel/replace 67 vs 333 ns).
 
 The deep-book cancel case is dominated by cache misses on random order lookups (40k orders × 32 B nodes plus the id
