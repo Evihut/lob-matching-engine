@@ -1,0 +1,48 @@
+name: ci
+on: [push, pull_request]
+
+jobs:
+  build-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, cxx: g++-13 }
+          - { os: ubuntu-latest, cxx: clang++ }
+          - { os: macos-latest, cxx: clang++ }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
+      - name: Build
+        run: cmake --build build -j4
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  sanitizers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DLOB_SANITIZE=ON -DLOB_BUILD_BENCH=OFF -DCMAKE_CXX_COMPILER=clang++
+      - run: cmake --build build -j4
+      - run: ctest --test-dir build --output-on-failure
+
+  # Shared CI runners are noisy VMs: these numbers are indicative only, but on
+  # x86 they use RDTSC, which resolves individual messages far below 1 ns.
+  replay-benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DLOB_BUILD_TESTS=OFF
+      - run: cmake --build build -j4
+      - run: ./build/lob_gen flow.csv 5000000 42 10000
+      - run: ./build/lob_replay flow.csv --runs 5 | tee replay.md
+      - run: ./build/lob_bench --benchmark_min_time=0.5s --benchmark_repetitions=3 --benchmark_report_aggregates_only=true | tee bench.txt
+      - run: cat replay.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: |
+            replay.md
+            bench.txt
