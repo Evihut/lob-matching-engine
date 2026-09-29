@@ -9,8 +9,9 @@ latency percentiles and sustained throughput.
 - **Correctness:** 55 GoogleTest cases, including a differential fuzz test of 1.6M random messages against a
   textbook `std::map` reference book (identical trade streams and top of book after every message);
   clean under AddressSanitizer + UBSan
-- **Performance (Apple M4, single thread):** **91 M msgs/s** on a 5M-message replay, **5.7× the `std::map` baseline**;
-  add+cancel in **7.9 ns**, single-order match in **8.3 ns**
+- **Performance (single thread):** **91 M msgs/s** on a 5M-message replay on an Apple M4, **5.7× the `std::map`
+  baseline**; add+cancel in **7.9 ns**, single-order match in **8.3 ns**. With `RDTSC` on x86 (GitHub Actions runner):
+  per-message **p50 64 ns / p99 139 ns / p99.9 209 ns** including ~20 ns of timer overhead
 
 ## Design
 
@@ -60,11 +61,24 @@ Message mix: 54% limit (incl. 4% marketable, some IOC), 37% cancel, 5.5% reduce,
 > **Measurement caveat.** On Apple Silicon the finest user-space clock ticks every 41.67 ns (24 MHz), so a single
 > message that takes ~10 ns usually measures as 0 or 42 ns. The percentiles above are therefore quantized to that
 > tick and include the timer's own overhead: read "p99 ≤ 42 ns" as "99% of messages finished within one timer tick".
-> Throughput is measured untimed over the whole replay and is not affected. On x86-64 the harness uses `RDTSC`
-> (sub-nanosecond resolution); the CI workflow runs the same replay on a Linux x86 runner (see the job summary of the
-> latest `ci` run).
+> Throughput is measured untimed over the whole replay and is not affected. For real per-message percentiles see the
+> x86 table below.
 
-### Micro-benchmarks (Google Benchmark, median of 5 repetitions, CV < 3%)
+#### x86-64 with RDTSC (GitHub Actions `ubuntu-latest`, 4 vCPU @ 3.1 GHz, GCC, shared VM)
+
+Same generator settings (the flow differs slightly because libstdc++ and libc++ implement the random distributions
+differently). `RDTSC` ticks every 0.435 ns here; each sample is bracketed by `LFENCE; RDTSC; LFENCE`, whose
+back-to-back overhead is **~20 ns** and is included in every number below (not subtracted). Shared CI VMs are noisy,
+so treat tails as indicative. Reproduced on every push by the `replay-benchmark` CI job.
+
+| Book | Throughput | Mean per msg | p50 | p90 | p99 | p99.9 |
+|---|---:|---:|---:|---:|---:|---:|
+| **ladder (this engine)** | **50.7 M msgs/s** | **19.7 ns** | **64 ns** | **85 ns** | **139 ns** | **209 ns** |
+| std::map baseline | 14.0 M msgs/s | 71.4 ns | 98 ns | 147 ns | 223 ns | 400 ns |
+
+Per message type (ladder): limit p50/p99 63/144 ns, market 61/142 ns, cancel 71/125 ns, reduce 69/130 ns.
+
+### Micro-benchmarks (Google Benchmark, Apple M4, median of 5 repetitions, CV < 3%)
 
 | Benchmark | ladder | std::map | Speed-up |
 |---|---:|---:|---:|
@@ -74,6 +88,9 @@ Message mix: 54% limit (incl. 4% marketable, some IOC), 37% cancel, 5.5% reduce,
 | Sweep 1 level + refill (per iteration, 5 msgs) | 28.9 ns | 211 ns | 7.3× |
 | Sweep 10 levels + refill (per iteration, 41 msgs) | 297 ns | 2,231 ns | 7.5× |
 | Sweep 50 levels + refill (per iteration, 201 msgs) | 1,458 ns | 11,548 ns | 7.9× |
+
+On the x86 CI runner the same benchmarks show 2.5–4.5× speed-ups (e.g. add+cancel 19.6 vs 87.0 ns, deep-book
+cancel/replace 67 vs 333 ns).
 
 The deep-book cancel case is dominated by cache misses on random order lookups (40k orders × 32 B nodes plus the id
 table exceed L1), which is why it is the slowest per message for both books.
