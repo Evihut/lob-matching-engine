@@ -20,7 +20,7 @@ template <class Listener = NullListener>
 class MapOrderBook {
 public:
     explicit MapOrderBook(BookConfig cfg = {}, Listener listener = {})
-        : min_price_(cfg.min_price), max_price_(cfg.max_price), listener_(std::move(listener)) {
+        : min_price_((cfg.validate(), cfg.min_price)), max_price_(cfg.max_price), listener_(std::move(listener)) {
         index_.reserve(cfg.expected_orders);
     }
 

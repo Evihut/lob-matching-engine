@@ -1,7 +1,6 @@
 #pragma once
 
 #include <bit>
-#include <cassert>
 #include <cstdint>
 #include <optional>
 #include <vector>
@@ -30,8 +29,9 @@ namespace lob {
 template <class Listener = NullListener>
 class OrderBook {
 public:
+    // Throws std::invalid_argument if the config is invalid (see BookConfig::validate).
     explicit OrderBook(BookConfig cfg = {}, Listener listener = {})
-        : min_price_(cfg.min_price),
+        : min_price_((cfg.validate(), cfg.min_price)),
           max_price_(cfg.max_price),
           levels_(static_cast<std::size_t>(cfg.max_price - cfg.min_price + 1)),
           bitmap_((levels_.size() + 63) / 64, 0),
@@ -40,7 +40,6 @@ public:
           best_bid_(kNoBid),
           best_ask_(static_cast<std::int64_t>(levels_.size())),
           listener_(std::move(listener)) {
-        assert(cfg.min_price <= cfg.max_price);
         nodes_.reserve(cfg.expected_orders);
         free_.reserve(cfg.expected_orders);
     }

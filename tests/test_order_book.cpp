@@ -245,3 +245,12 @@ TYPED_TEST(OrderBookTest, LargestNonReservedIdWorks) {
     EXPECT_EQ(*this->book.order_qty(id), 5);
     EXPECT_TRUE(this->book.cancel(id));
 }
+
+TYPED_TEST(OrderBookTest, InvalidConfigThrowsInEveryBuildType) {
+    using Book = TypeParam;
+    EXPECT_THROW(Book(BookConfig{10, 9, 16}), std::invalid_argument);
+    EXPECT_THROW(Book(BookConfig{0, BookConfig::kMaxLevels, 16}), std::invalid_argument);  // 2^31 + 1 levels
+    EXPECT_THROW(Book(BookConfig{INT64_MIN, INT64_MAX, 16}), std::invalid_argument);       // no overflow
+    EXPECT_NO_THROW(Book(BookConfig{5, 5, 16}));                                           // single level
+    EXPECT_NO_THROW(Book(BookConfig{-100, 100, 16}));                                      // negative ticks allowed
+}

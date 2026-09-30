@@ -2,6 +2,8 @@
 
 #include <cstdint>
 #include <limits>
+#include <stdexcept>
+#include <string>
 
 namespace lob {
 
@@ -57,6 +59,19 @@ struct BookConfig {
     Price max_price = 1 << 20;
     std::uint32_t expected_orders = 1 << 16;
 
+    // Largest band the optimized book supports: level indices are 32-bit.
+    static constexpr Price kMaxLevels = Price{1} << 31;
+
+    // Throws std::invalid_argument; checked in every build type, not only with asserts.
+    void validate() const {
+        if (min_price > max_price)
+            throw std::invalid_argument("BookConfig: min_price (" + std::to_string(min_price) +
+                                        ") > max_price (" + std::to_string(max_price) + ")");
+        // Unsigned difference is exact for any min_price <= max_price (no signed overflow).
+        if (static_cast<std::uint64_t>(max_price) - static_cast<std::uint64_t>(min_price) >=
+            static_cast<std::uint64_t>(kMaxLevels))
+            throw std::invalid_argument("BookConfig: price band wider than " + std::to_string(kMaxLevels) + " ticks");
+    }
 };
 
 // Receives execution events. Books take the listener as a template parameter,
