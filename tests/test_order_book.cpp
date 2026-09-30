@@ -218,3 +218,30 @@ TEST(LadderBitmap, BestPriceAcrossSummaryWordsInWideBand) {
     EXPECT_TRUE(book.cancel(3));
     EXPECT_FALSE(book.best_bid());
 }
+
+// Regression: kReservedOrderId (UINT64_MAX) is IdMap's empty-slot marker. Before
+// it was rejected, cancel() on an empty book "found" an empty slot and indexed a
+// node that did not exist (out-of-bounds read, caught by ASan / hardened libc++).
+TYPED_TEST(OrderBookTest, ReservedOrderIdIsRejectedEverywhere) {
+    EXPECT_FALSE(this->book.cancel(kReservedOrderId));  // empty book: the original crash
+    EXPECT_FALSE(this->book.reduce(kReservedOrderId, 1));
+    EXPECT_FALSE(this->book.order_qty(kReservedOrderId));
+    EXPECT_EQ(this->book.add_limit(kReservedOrderId, B, 100, 5).status, Status::RejectedInvalidId);
+    EXPECT_EQ(this->book.add_market(kReservedOrderId, S, 5).status, Status::RejectedInvalidId);
+
+    this->book.add_limit(1, B, 100, 5);
+    this->book.add_limit(2, S, 101, 5);
+    EXPECT_FALSE(this->book.cancel(kReservedOrderId));  // non-empty book
+    EXPECT_EQ(this->book.add_limit(kReservedOrderId, S, 100, 5).status, Status::RejectedInvalidId);
+    EXPECT_TRUE(this->trades().empty());  // the rejected crossing order must not trade
+    EXPECT_EQ(this->book.order_count(), 2u);
+    EXPECT_TRUE(this->book.cancel(1));
+    EXPECT_TRUE(this->book.cancel(2));
+}
+
+TYPED_TEST(OrderBookTest, LargestNonReservedIdWorks) {
+    const OrderId id = kReservedOrderId - 1;
+    EXPECT_EQ(this->book.add_limit(id, B, 100, 5).status, Status::Resting);
+    EXPECT_EQ(*this->book.order_qty(id), 5);
+    EXPECT_TRUE(this->book.cancel(id));
+}

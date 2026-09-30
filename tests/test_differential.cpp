@@ -36,8 +36,11 @@ std::vector<Msg> random_flow(std::size_t n, std::uint64_t seed, Price lo, Price 
             const Price px = mid + static_cast<Price>(rng() % static_cast<std::uint64_t>(2 * spread + 1)) - spread +
                              (rng() % 200 == 0 ? hi : 0);
             const auto tif = rng() % 10 == 0 ? TimeInForce::IOC : TimeInForce::GTC;
-            // 2% of adds deliberately reuse an id to exercise duplicate rejection.
-            const OrderId id = rng() % 50 == 0 && !issued.empty() ? issued[rng() % issued.size()] : next++;
+            // 2% of adds reuse an id (duplicate rejection), 0.5% use the reserved id.
+            const auto pick = rng() % 200;
+            const OrderId id = pick < 4 && !issued.empty() ? issued[rng() % issued.size()]
+                               : pick == 4                 ? kReservedOrderId
+                                                           : next++;
             out.push_back({MsgType::AddLimit, side, tif, id, px, qty, 0});
             issued.push_back(id);
         } else if (r < 80) {

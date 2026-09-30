@@ -12,15 +12,17 @@ namespace lob {
 //
 // Linear probing with Fibonacci hashing, and backward-shift deletion instead of
 // tombstones, so lookups stay short after heavy add/cancel churn. The key
-// UINT64_MAX is reserved as the empty marker.
+// kReservedOrderId (UINT64_MAX) is the empty marker; find/insert/erase treat it
+// as absent, so a caller passing it can never alias an empty slot.
 class IdMap {
 public:
-    static constexpr OrderId kEmptyKey = std::numeric_limits<OrderId>::max();
+    static constexpr OrderId kEmptyKey = kReservedOrderId;
     static constexpr std::uint32_t kNotFound = std::numeric_limits<std::uint32_t>::max();
 
     explicit IdMap(std::uint32_t expected = 1024) { rehash(capacity_for(expected)); }
 
     std::uint32_t find(OrderId key) const noexcept {
+        if (key == kEmptyKey) return kNotFound;
         std::size_t i = home(key);
         while (true) {
             const Slot& s = slots_[i];
@@ -32,6 +34,7 @@ public:
 
     // Returns false (and leaves the map unchanged) if the key already exists.
     bool insert(OrderId key, std::uint32_t value) {
+        if (key == kEmptyKey) return false;
         if ((size_ + 1) * 2 > slots_.size()) rehash(slots_.size() * 2);
         std::size_t i = home(key);
         while (slots_[i].key != kEmptyKey) {
@@ -44,6 +47,7 @@ public:
     }
 
     bool erase(OrderId key) noexcept {
+        if (key == kEmptyKey) return false;
         std::size_t i = home(key);
         while (slots_[i].key != key) {
             if (slots_[i].key == kEmptyKey) return false;

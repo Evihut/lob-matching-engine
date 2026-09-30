@@ -22,6 +22,16 @@ TEST(IdMap, InsertFindErase) {
     EXPECT_EQ(m.find(10), IdMap::kNotFound);
 }
 
+TEST(IdMap, ReservedKeyNeverAliasesAnEmptySlot) {
+    IdMap m(4);
+    EXPECT_EQ(m.find(kReservedOrderId), IdMap::kNotFound);  // previously returned an empty slot's value
+    EXPECT_FALSE(m.insert(kReservedOrderId, 7));
+    EXPECT_FALSE(m.erase(kReservedOrderId));
+    EXPECT_EQ(m.size(), 0u);
+    EXPECT_TRUE(m.insert(kReservedOrderId - 1, 3));
+    EXPECT_EQ(m.find(kReservedOrderId - 1), 3u);
+}
+
 TEST(IdMap, MatchesUnorderedMapUnderChurnAndGrowth) {
     IdMap m(8);  // deliberately small so it rehashes many times
     std::unordered_map<OrderId, std::uint32_t> ref;

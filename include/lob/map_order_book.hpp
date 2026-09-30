@@ -26,6 +26,7 @@ public:
 
     AddResult add_limit(OrderId id, Side side, Price price, Qty qty,
                         TimeInForce tif = TimeInForce::GTC) {
+        if (id == kReservedOrderId) return {Status::RejectedInvalidId, 0, 0};
         if (qty <= 0) return {Status::RejectedInvalidQty, 0, 0};
         if (price < min_price_ || price > max_price_) return {Status::RejectedInvalidPrice, 0, 0};
         if (index_.contains(id)) return {Status::RejectedDuplicateId, 0, 0};
@@ -43,6 +44,7 @@ public:
     }
 
     AddResult add_market(OrderId id, Side side, Qty qty) {
+        if (id == kReservedOrderId) return {Status::RejectedInvalidId, 0, 0};
         if (qty <= 0) return {Status::RejectedInvalidQty, 0, 0};
         const Qty filled = side == Side::Buy ? match(asks_, id, side, qty, max_price_)
                                              : match(bids_, id, side, qty, min_price_);

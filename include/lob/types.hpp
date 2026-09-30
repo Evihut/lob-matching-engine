@@ -1,12 +1,17 @@
 #pragma once
 
 #include <cstdint>
+#include <limits>
 
 namespace lob {
 
 using OrderId = std::uint64_t;
 using Price = std::int64_t;  // integer ticks; never a floating point price
 using Qty = std::int64_t;
+
+// The one order id callers may not use: IdMap stores it as its empty-slot marker.
+// Every entry point rejects it explicitly.
+inline constexpr OrderId kReservedOrderId = std::numeric_limits<OrderId>::max();
 
 enum class Side : std::uint8_t { Buy = 0, Sell = 1 };
 
@@ -22,6 +27,7 @@ enum class Status : std::uint8_t {
     Filled,              // fully filled on arrival
     Expired,             // IOC / market remainder cancelled (it may have partially filled first)
     RejectedDuplicateId, // a resting order already uses this id
+    RejectedInvalidId,   // id == kReservedOrderId
     RejectedInvalidQty,  // qty <= 0
     RejectedInvalidPrice // limit price outside the configured band
 };
@@ -50,6 +56,7 @@ struct BookConfig {
     Price min_price = 1;
     Price max_price = 1 << 20;
     std::uint32_t expected_orders = 1 << 16;
+
 };
 
 // Receives execution events. Books take the listener as a template parameter,

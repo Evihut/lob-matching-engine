@@ -47,6 +47,7 @@ public:
 
     AddResult add_limit(OrderId id, Side side, Price price, Qty qty,
                         TimeInForce tif = TimeInForce::GTC) {
+        if (id == kReservedOrderId) return {Status::RejectedInvalidId, 0, 0};
         if (qty <= 0) return {Status::RejectedInvalidQty, 0, 0};
         if (price < min_price_ || price > max_price_) return {Status::RejectedInvalidPrice, 0, 0};
         if (ids_.find(id) != IdMap::kNotFound) return {Status::RejectedDuplicateId, 0, 0};
@@ -62,6 +63,7 @@ public:
 
     // Market orders sweep the opposite side and never rest.
     AddResult add_market(OrderId id, Side side, Qty qty) {
+        if (id == kReservedOrderId) return {Status::RejectedInvalidId, 0, 0};
         if (qty <= 0) return {Status::RejectedInvalidQty, 0, 0};
         const Qty filled = side == Side::Buy
                                ? match_buy(id, qty, static_cast<std::int64_t>(levels_.size()) - 1)
