@@ -6,7 +6,7 @@ latency percentiles and sustained throughput.
 
 - **Order types:** limit (GTC / IOC), market, cancel, and reduce (partial cancel that keeps queue priority)
 - **Matching:** strict price-time priority; trades print at the resting order's price
-- **Correctness:** 55 GoogleTest cases, including a differential fuzz test of 1.6M random messages against a
+- **Correctness:** 62 GoogleTest cases, including a differential fuzz test of 1.6M random messages against a
   textbook `std::map` reference book (identical trade streams and top of book after every message);
   clean under AddressSanitizer + UBSan
 - **Performance (single thread):** **91 M msgs/s** on a 5M-message replay on an Apple M4, **5.7× the `std::map`
@@ -144,7 +144,12 @@ book.cancel(2);
 ```
 
 Every add returns `AddResult{status, filled, remaining}` where status is one of `Resting`, `Filled`, `Expired`,
-`RejectedDuplicateId`, `RejectedInvalidQty`, `RejectedInvalidPrice`.
+`RejectedDuplicateId`, `RejectedInvalidId`, `RejectedInvalidQty`, `RejectedInvalidPrice`.
+
+Order id `lob::kReservedOrderId` (`UINT64_MAX`) is reserved: the id map uses it as its empty-slot marker, so every
+entry point rejects it (`RejectedInvalidId`, or `false` from `cancel` / `reduce`). An invalid `BookConfig`
+(`min_price > max_price`, or a band wider than 2³¹ ticks) throws `std::invalid_argument` from the constructor in
+every build type.
 
 ## Layout
 
